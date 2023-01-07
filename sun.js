@@ -11,7 +11,7 @@ if ( WEBGL.isWebGLAvailable() === false ) {body.appendChild( WEBGL.getWebGLError
  //var file="./Shoulder_Closures.mp3"; ///*Copyright (c) 2017 - Misaki Nakano - https://codepen.io/mnmxmx/pen/mmZbPK/*/  Audio Visualizer2
  var samplefiles=["","Shoulder_Closures.mp3","Sample.m4a", "sample_etsitune.mp3"]; 
  
- var AudioSources = [], aux=0;
+ var AudioSources = [], aux=-1;
 function stopAll() {  for(let i = 0; i < 8; i++) if (AudioSources[i])AudioSources[i].close(0); if(aux==3) aux=0;}
  
  
