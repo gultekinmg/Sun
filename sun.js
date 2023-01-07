@@ -1,46 +1,47 @@
-var WX=window.innerWidth,WY=Math.max(600, window.innerHeight);
-var body=document.body, RENDERER_container=document.getElementById("OrbitWrapper"); body.classList.add("color");
-var ANALYSER, ANALYSER_L, ANALYSER_R, freQuencyAvg=0, freQuency_R, freQuency_L
+var 	WX=window.innerWidth,WY=Math.max(600, window.innerHeight);
+var 	body=document.body, RENDERER_container=document.getElementById("OrbitWrapper"); 
+		body.classList.add("color");
+var 	audio, ANALYSER, ANALYSER_L, ANALYSER_R, 
+		freQuencyAvg=0, freQuency_R, freQuency_L
 		,Three_canvas, SCENE, GROUP_SUN, WEBGL,  RENDERER, VIEWS, stats, BG_Mesh,BG_uniforms
-		, CAMPOS, cX=0,cY=0,cZ=1000,FIELDOFVIEW=45, ASPECTRATIO=WX / WY /*16/9*/, _near=0.1, _far=10000
-   , IMAX=400,LASTTIME=ONCE=new Date() * 0.0001,LASTFRAME=500, RADIUS=100, THETA= 0,_layerno=0 ;
+		, CAM_POS, cX=0,cY=0,cZ=1000,FIELDOFVIEW=45, ASPECTRATIO=WX / WY /*16/9*/, _near=0.1, _far=10000
+		, IMAX=400,		LASTTIME=ONCE=new Date() * 0.0001,	LASTFRAME=500, RADIUS=100, THETA= 0,_layerno=0 ;
+var  monitor_stats='position:absolute; top:70px; right:160px; opacity:0.5; backgroundColor:#00011;';		
 if ( WEBGL.isWebGLAvailable() === false ) {body.appendChild( WEBGL.getWebGLErrorMessage() );}
-///*Copyright (c) 2017 - Misaki Nakano - https://codepen.io/mnmxmx/pen/mmZbPK/*/
+ //var file="./Shoulder_Closures.mp3"; ///*Copyright (c) 2017 - Misaki Nakano - https://codepen.io/mnmxmx/pen/mmZbPK/*/  Audio Visualizer2
+ var samplefiles=["","Shoulder_Closures.mp3","Sample.m4a", "sample_etsitune.mp3"]; 
+ 
+ var AudioSources = [], aux=0;
+function stopAll() {  for(let i = 0; i < 8; i++) if (AudioSources[i])AudioSources[i].close(0); if(aux==3) aux=0;}
+ 
+ 
 class Audio {
-  constructor() {
-    this.source=null;
-    this.Context=window.AudioContext ? new AudioContext() : new webkitAudioContext();
+  constructor() { AudioSources[aux++]=this.ACTx=window.AudioContext ? new AudioContext() : new webkitAudioContext();
+    this.source=null;   
     this.fileReader=new FileReader();
     this.init();
     this.isReady=false;
     this.count=0;
     this.process();
   }
-  init() {// make a stereo Web Audio Context
-		this.splitter=this.Context.createChannelSplitter();
-		ANALYSER_L=this.Context.createAnalyser();	ANALYSER_L .fftSize=8192;
+  init() { // make a stereo Web Audio ACTx
+		this.splitter=this.ACTx.createChannelSplitter();
+		ANALYSER_L=this.ACTx.createAnalyser();	ANALYSER_L .fftSize=8192;
 		ANALYSER_L.minDecibels=-70;  ANALYSER_L.maxDecibels=10;  ANALYSER_L.smoothingTimeConstant=.75;
-    ANALYSER=
-		ANALYSER_R=this.Context.createAnalyser(); ANALYSER_R.fftSize=2048;
-    ANALYSER_R.minDecibels=-70;  ANALYSER_R.maxDecibels=10;  ANALYSER_R.smoothingTimeConstant=.75;
-
-		// if (location.hostname	)	// location.hostname !== "localhost" && location.hostname !== "0.0.0.0" && location.hostname !== "widget-dev.cloudinary.com"
-			// {
-    // }else{ 
-		document.getElementById('file')
-		.addEventListener('change', function (e) { this.fileReader.readAsArrayBuffer(e.target.files[0]);
-		console.log('song',e.target.files[0]); }.bind(this));
-	//	}
-    var here=this;
+		ANALYSER = ANALYSER_R = this.ACTx.createAnalyser(); ANALYSER_R.fftSize=2048;
+		ANALYSER_R.minDecibels=-70;  ANALYSER_R.maxDecibels=10;  ANALYSER_R.smoothingTimeConstant=.75;
+document.getElementById('uri').addEventListener('change', function (e) { this.fileReader.readAsArrayBuffer(e.target.files[0]);
+console.log('song',e.target.files[0]); }.bind(this));
+    var here=this;   
     this.fileReader.onload=function () {	
-       here.Context.decodeAudioData(here.fileReader.result, function (buffer) {
+       here.ACTx.decodeAudioData(here.fileReader.result, function (buffer) {
         if (here.source) {here.source.stop();}
-        here.source= here.Context.createBufferSource(); here.source.buffer=buffer; here.source.loop=true;
+        here.source= here.ACTx.createBufferSource(); here.source.buffer=buffer; here.source.loop=true;
 				//
         here.source.connect(here.splitter); here.splitter.connect(ANALYSER_L, 0, 0); here.splitter.connect(ANALYSER_R, 1, 0);
 				//
-        here.gainNode= here.Context.createGain();
-        here.source.connect(here.gainNode); here.gainNode.connect( here.Context.destination);
+        here.gainNode= here.ACTx.createGain();
+        here.source.connect(here.gainNode); here.gainNode.connect( here.ACTx.destination);
 				//
         here.source.start(0);
         here.frequencyArray=WEBGL.sphere_BG.attributes.aFrequency.array;
@@ -53,7 +54,10 @@ class Audio {
       });
 				createBackGround.animate();
     };
-  }
+fetch(samplefiles[aux]).then(r=>r.blob()).then(blob=>this.fileReader.readAsArrayBuffer(blob)); /// auto load ***************************************
+//noneed this.fileReader.readAsArrayBuffer(file); 
+
+	}
   Visualizer() {if (!this.isReady) return;//renders mesh
     this.count++;
    ANALYSER_R.getByteFrequencyData(freQuency_R); ANALYSER_L.getByteFrequencyData(freQuency_L);	/// receive the audio data to buffer
@@ -97,16 +101,16 @@ class Webgl {
 		/// for scene use lights
 		this.createLight();
 	/// use multi view camera
-		CAMPOS=[[0,0,1000],[0,1000,0]];
+		CAM_POS=[[0,0,1000],[0,1000,0]];
 		VIEWS=[
-				{left: 0,top: 0, width: 1.0, height: 1.0, eye: CAMPOS[ 0 ], up: [ 0, 1, 0 ], fov: 30, background: 0x220088, 
+				{left: 0,top: 0, width: 1.0, height: 1.0, eye: CAM_POS[ 0 ], up: [ 0, 1, 0 ], fov: 30, background: 0x220088, 
 					updateCamera: function ( cam, scn, pos ) {
 					  if(pos[0]){cam.position.x -= pos[0] * 0.05;  cam.position.x=Math.max( Math.min( cam.position.x, 1000 ), - 1000 );}
 					  if(pos[1]){cam.position.y -= pos[1] * 0.05;  cam.position.y=Math.max( Math.min( cam.position.y, 1000 ), - 1000 );}
 					  if(pos[2]){cam.position.z -= pos[2] * 0.05;  cam.position.z=Math.max( Math.min( cam.position.z, 1000 ), - 100 );}
 					  cam.lookAt( scn.position );}
 				},
-				{left: 0.75, top: 0.75, width: 0.2, height: 0.2, eye: CAMPOS[ 1 ], up: [ 0, 0, 1 ], fov: 75,	background: 0x220088, //new THREE.Color( 0.7, 0.5, 0.5 ),
+				{left: 0.75, top: 0.75, width: 0.2, height: 0.2, eye: CAM_POS[ 1 ], up: [ 0, 0, 1 ], fov: 75,	background: 0x220088, //new THREE.Color( 0.7, 0.5, 0.5 ),
 					updateCamera: function ( cam, scn, pos) {
 					  if(pos[0]){cam.position.x -= pos[0] * 0.05;  cam.position.x=Math.max( Math.min( cam.position.x, 2000 ), - 1000 );}
 					 // if(pos[1]){cam.position.x -= pos[1] * 0.05;  cam.position.y=Math.max( Math.min( cam.position.y, 2000 ), - 2000 );}
@@ -115,16 +119,17 @@ class Webgl {
 				}
 		];	
     /// setting the initial values of the perspective camera
-		for ( var n=0; n < VIEWS.length; ++ n ) {	var view=VIEWS[ n ];
+		for ( var n=0; n < VIEWS.length; ++ n ) {	
+			var view=VIEWS[ n ];
 			var cam=new THREE.PerspectiveCamera( view.fov, ASPECTRATIO , _near ,  _far );
-			cam.position.fromArray( view.eye );/// initial array VIEWS[ 0 ].camera.position.set(CAMPOS[ 0 ][ 0 ], CAMPOS[ 0 ][ 1], CAMPOS[ 0 ][ 2 ]);
+			cam.position.fromArray( view.eye );/// initial array VIEWS[ 0 ].camera.position.set(CAM_POS[ 0 ][ 0 ], CAM_POS[ 0 ][ 1], CAM_POS[ 0 ][ 2 ]);
 			cam.up.fromArray( view.up );///
 			view.camera=cam; /// VIEWS[0].camera ;
-		}		//console.log(VIEWS);
-   //VIEWS[ 0 ].camera=new THREE.PerspectiveCamera(FIELDOFVIEW, ASPECTRATIO , _near ,  _far );
-			//	VIEWS[ 0 ].camera.layers.enable( 0 );	VIEWS[ 0 ].camera.layers.enable( 1 );	VIEWS[ 0 ].camera.layers.enable( 2 );
-   //VIEWS[ 0 ].camera.position.set(cX, cY, cZ); ///SCENE.add( VIEWS[ 0 ].camera );
-   //VIEWS[ 0 ].camera.lookAt(SCENE.position);
+		}		//   console.log(VIEWS);
+				//   VIEWS[ 0 ].camera=new THREE.PerspectiveCamera(FIELDOFVIEW, ASPECTRATIO , _near ,  _far );
+				//	 VIEWS[ 0 ].camera.layers.enable( 0 );	VIEWS[ 0 ].camera.layers.enable( 1 );	VIEWS[ 0 ].camera.layers.enable( 2 );
+				//   VIEWS[ 0 ].camera.position.set(cX, cY, cZ); ///SCENE.add( VIEWS[ 0 ].camera );
+				//   VIEWS[ 0 ].camera.lookAt(SCENE.position);
 		///Initial and final quaternions
 /* 		VIEWS[ 0 ].camera.useQuaternion=true;
 		var startQ=new THREE.Quaternion(0,0,0,1), endQ=new THREE.Quaternion(0,1,0,0);
@@ -135,8 +140,8 @@ class Webgl {
 		}
 		goSlerping(1/ this.animFrames,this.mesh_C.quaternion);		 */
 		
-		/// cursor route
-    var orbit=new THREE.OrbitControls(VIEWS[ 0 ].camera, RENDERER.domElement);
+		
+    var orbit=new THREE.OrbitControls(VIEWS[ 0 ].camera, RENDERER.domElement); /// route with cursor......
 /*     this.WX=WX;  this.WY=window.innerHeight;
     this.mouse={ x: 0, y: 0, old_x: 0, old_y: 0 };
         document.addEventListener( 'mousemove', function(event){
@@ -144,19 +149,17 @@ class Webgl {
           this.mouse.old_y=this.mouse.y;this.mouse.y=event.clientY - this.WY / 2;
         }.bind(this), false ); */
 
-    window.onresize=function () {
+    window.onresize=function () { /// resize container
       RENDERER_container.style.width=WX + "px";
       RENDERER_container.style.height=WY + "px";
 			this.render() ;
     }.bind(this);
-				//
-				stats=new Stats();
-				stats.domElement.style.cssText='position:absolute;top:70px;right:160px;opacity:0.6;backgroundColor:#00011;';
-				RENDERER_container.appendChild( stats.dom );
-				//
-
-		/// animations
-		plug_init(this);
+	//
+	stats=new Stats();
+	stats.domElement.style.cssText=monitor_stats;
+	RENDERER_container.appendChild( stats.dom );
+	//
+	plug_init(this);	/// animations
   }
   createSphere() {
     this.createShader();
@@ -342,7 +345,7 @@ class Webgl {
 	render() {/// from animate /// updateCameras
 			//this.updateSize();
 			for ( var n=0; n < VIEWS.length; ++ n ) {
-				var view=VIEWS[ n ]; var cam=view.camera;	view.updateCamera( cam, SCENE, CAMPOS[n] );///
+				var view=VIEWS[ n ]; var cam=view.camera;	view.updateCamera( cam, SCENE, CAM_POS[n] );///
 				var LEFT=Math.floor( WX * view.left ), TOP=Math.floor( WY * view.top ),
 							WIDTH=Math.floor( WX * view.width ), HEIGHT=Math.floor( WY * view.height );
 				RENDERER.setViewport( LEFT, TOP, WIDTH, HEIGHT );
@@ -357,42 +360,46 @@ class Webgl {
     this.sphere_BG.attributes.aFrequency.needsUpdate=true;
     this.sphere_BG_L.attributes.aFrequency.needsUpdate=true;
     this.sphere_BG_R.attributes.aFrequency.needsUpdate=true;    // update method
-/*     var d=this.mouse.x - this.mouse.old_x, theta=d * 0.1;
-    var sin=Math.sin(theta), cos=Math.cos(theta);
-    var x =VIEWS[ 0 ].camera.position.x, z =VIEWS[ 0 ].camera.position.z;
-   VIEWS[ 0 ].camera.position.x=x * cos - z * sin; VIEWS[ 0 ].camera.position.z=x * sin + z * cos;
-   VIEWS[ 0 ].camera.lookAt( SCENE.position ); */
+/*
+		var d=this.mouse.x - this.mouse.old_x, theta=d * 0.1;
+		var sin=Math.sin(theta), cos=Math.cos(theta);
+		var x =VIEWS[ 0 ].camera.position.x, z =VIEWS[ 0 ].camera.position.z;
+		VIEWS[ 0 ].camera.position.x=x * cos - z * sin; VIEWS[ 0 ].camera.position.z=x * sin + z * cos;
+		VIEWS[ 0 ].camera.lookAt( SCENE.position ); 
+*/
 		var now=new Date() * 0.0001,  delta=this.clock.getDelta(), per=THETA/IMAX, bias=1 - Math.abs(.5 - per) / .5, 
 					elapsed1=(now - LASTTIME) % 60, elapsed2=(now - ONCE) % 60;
 		if (elapsed1 <=LASTFRAME) { THETA+= 1; THETA= THETA%IMAX;  LASTTIME=now; 
- 				var x=RADIUS * Math.sin( THREE.Math.degToRad( THETA) );
-			  var y=RADIUS * Math.sin( THREE.Math.degToRad( THETA) );
+				var x=RADIUS * Math.sin( THREE.Math.degToRad( THETA) );
+				var y=RADIUS * Math.sin( THREE.Math.degToRad( THETA) );
 				var z=RADIUS * Math.cos( THREE.Math.degToRad( THETA) );
-		//SCENE.position.set(cX+THETA, cY+THETA, cZ-THETA );
-			// changing aspect, and field of view       VIEWS[ 0 ].camera.aspect=.5 + 1.5 * bias; 
+				//SCENE.position.set(cX+THETA, cY+THETA, cZ-THETA );
+				/* changing aspect, and field of view  */     // VIEWS[ 0 ].camera.aspect=.5 + 1.5 * bias; 
 				//VIEWS[ 0 ].camera.fov=FIELDOFVIEW + 25 * bias;	VIEWS[ 0 ].camera.updateProjectionMatrix(); // I must call this to get it to work
-		//VIEWS[ 0 ].camera.position.set(cX+x, cY+2*y, cZ-3*z ); 		//	VIEWS[ 0 ].camera.position.set(cX+50 * bias, cY+55 * bias , cZ-55 * bias );
-		var oldPos=CAMPOS[0], a2=[x, y , oldPos[2]* bias*-0.8];	CAMPOS[0]=oldPos.map((a, i) => a + a2[i]); ///console.log('sum',CAMPOS[0]);
+				//VIEWS[ 0 ].camera.position.set(cX+x, cY+2*y, cZ-3*z ); 		//	VIEWS[ 0 ].camera.position.set(cX+50 * bias, cY+55 * bias , cZ-55 * bias );
+		var oldPos=CAM_POS[0], a2=[x, y , oldPos[2]* bias*-0.8];	
+		CAM_POS[0]=oldPos.map((a, i) => a + a2[i]); ///console.log('sum',CAM_POS[0]);
 		//VIEWS[ 0 ].camera.position.set(cX+x, cY+y , cZ-cZ* bias*0.8);
 		//VIEWS[ 0 ].camera.lookAt( SCENE.position );VIEWS[ 0 ].camera.updateMatrixWorld();
-		}///console.log('cam',CAMPOS);
+		} // console.log('cam',oldPos, CAM_POS[0]);
 		//if(freQuencyAvg>=77){_layerno+=1; if(_layerno>=3)_layerno=0;	VIEWS[ 0 ].camera.layers.toggle( _layerno );ONCE= now;	console.log(freQuencyAvg,elapsed2,_layerno);}
 		//if(_layerno!=0&&elapsed2 >=2){_layerno=0;VIEWS[ 0 ].camera.layers.toggle( _layerno );ONCE= now;}
 		//VIEWS[ 0 ].camera.layers.toggle( 2 );
 		//console.log(freQuencyAvg,elapsed2);
 /// plugins
 	//updateGlitch(check) {	this.glitchPass.goWild=check;}
-		plug_play(now);
+		PLUG_PLAY(now);
 		//stats.begin();
 		this.render() ;
 	///RENDERER.render(SCENE,VIEWS[ 0 ].camera);
 		//stats.end();
-				stats.update();
+		stats.update();
 }
 }
-window.onload=function () { WEBGL=new Webgl();  var audio=new Audio();};
+/// start Main;
+window.onload=function () { WEBGL=new Webgl();  audio=new Audio();};
 
-/// plugins
+/// plugins ==============================================================================================================
 var	createBackGround= (function() {
 			function init() {	//camera=new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
 				var geometry=new THREE.PlaneBufferGeometry( 2, 3 );
@@ -734,17 +741,10 @@ var	spots= (function() {	var ambient,spotLight1,spotLight2,spotLight3;	 var ligh
 				.to( {x: ( Math.random() * 300 ) - 15,	y: ( Math.random() * 310 ) + 15,	z: ( Math.random() * 300 ) - 15}, Math.random() * 3000 + 2000 )
 					.easing( TWEEN.Easing.Quadratic.Out ).start();
 			}
-			function animate() {
-				tween( spotLight1 );
-				tween( spotLight2 );
-				tween( spotLight3 );
-				tween( VIEWS[ 1 ].camera );
-				setTimeout( animate, 5000 );
+			function animate() { tween( spotLight1 ); tween( spotLight2 );	tween( spotLight3 );	tween( VIEWS[ 1 ].camera );
+				setTimeout( animate, 15000 );
 			}
-			function animatecam() {
-				tween( VIEWS[ 0 ].camera );
-				setTimeout( animatecam, 15000 );
-			}
+			function animatecam() {	tween( VIEWS[ 0 ].camera );	setTimeout( animatecam, 5000 );	}
 			function render() {
 				TWEEN.update();
 				if ( hlp){ lightHelper1.update(); lightHelper2.update();  lightHelper3.update();} 
@@ -763,15 +763,16 @@ function plug_init(here){ Three_canvas=RENDERER.domElement; //console.log(Three_
 		//FakeSun.init();
 		spots.init();
 }
-function plug_play(now){
+///
+function PLUG_PLAY(now){
 	if(WEBGL.light){	//if ( this.planet ) this.planet.rotation.y -= 0.5 * delta;
 				WEBGL.light.position.x=Math.sin( now * 0.7 ) * 30;
 				WEBGL.light.position.y=Math.cos( now * 0.5 ) * 40;
 				WEBGL.light.position.z=Math.cos( now * 0.3 ) * 30;
 	}
 	if(Radiate.run)		Radiate.update();
-	if(particles.run)		particles.animate(now);
-	if(spots.run)					spots.render();
+	if(particles.run)	particles.animate(now);
+	if(spots.run)			spots.render();
 	//if(FakeSun.run)	FakeSun.update();
 }
 	
