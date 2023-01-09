@@ -11,7 +11,7 @@ if ( WEBGL.isWebGLAvailable() === false ) {body.appendChild( WEBGL.getWebGLError
  //var file="./Shoulder_Closures.mp3"; ///*Copyright (c) 2017 - Misaki Nakano - https://codepen.io/mnmxmx/pen/mmZbPK/*/  Audio Visualizer2
  var samplefiles=["","Shoulder_Closures.mp3","Sample.m4a", "sample_etsitune.mp3"]; 
  
- var AudioSources = [], aux=-1;
+ var AudioSources = [], aux=0;
 function stopAll() {  for(let i = 0; i < 8; i++) if (AudioSources[i])AudioSources[i].close(0); if(aux==3) aux=0;}
  
  
@@ -422,7 +422,7 @@ var	createBackGround= (function() {
 			}
 	return {init:init,animate:animate};
 	}());
-
+//
 var	FakeSun= (function() {///ugh
 			var 
 				mycamera, materialDepth,
@@ -652,7 +652,70 @@ var Radiate=(function() {
 	}
 	return {init:init,	update:update,	remove:remove,	loopHolder:loopHolder	,run:true	};
 	}());
-
+//
+var Radiate2=(function() {
+	var RINGCOUNT=20, SEPARATION=50, INIT_RADIUS=40, SEGMENTS=256, VOL_SENS=2, BIN_COUNT=256
+				, rings=[],materials=[], levels=[], colors=[];
+	var loopHolder=new THREE.Object3D();
+	var perlin=new ImprovedNoise(), noisePos=0, freqByteData, timeByteData, loopGeom;//one geom for all rings
+	function init() {
+		rings=[];		geoms=[];		materials=[];		levels=[];	colors=[],	scale=2;
+		freqByteData=new Uint8Array(BIN_COUNT);		timeByteData=new Uint8Array(BIN_COUNT);//INIT audio in
+		GROUP_SUN.add(loopHolder);
+		var circleShape=new THREE.Shape();		circleShape.absarc( 110, 110, INIT_RADIUS, 0, Math.PI*2, false );
+		loopGeom=circleShape.createPointsGeometry(SEGMENTS/2);  loopGeom.dynamic=true;		//createPointsGeometry returns (SEGMENTS * 2 )+ 1 points
+		for(var i=0; i < RINGCOUNT; i++) {///create rings
+			var m=new THREE.LineBasicMaterial( { color: 0x000000, linewidth: 1 ,opacity : Rnd_opacity,blending : THREE.AdditiveBlending, //depthTest : false,
+				transparent : true});
+			var line=new THREE.Line( loopGeom, m);
+			rings.push(line); 
+			materials.push(m);
+			scale *= 1.08;		line.scale.x=scale;		line.scale.y=scale;
+			loopHolder.add(line);
+			levels.push(0); 
+			colors.push(0); 
+		}
+	}
+	function remove() {if (loopHolder){for(var i=0; i < RINGCOUNT; i++) {loopHolder.remove(rings[i]);}}}
+	function update() {
+		//analyser.smoothingTimeConstant=0.1;
+		ANALYSER.getByteFrequencyData(freqByteData);	ANALYSER.getByteTimeDomainData(timeByteData);
+		//get average level
+		///var sum=0;	for(var i=0; i < BIN_COUNT; i++) {sum += freqByteData[i];		}
+		///var aveLevel=sum / BIN_COUNT;
+		var scaled_average=(freQuencyAvg / 256) * VOL_SENS; //256 is the highest a level can be
+		levels.push(scaled_average);
+		//read waveform into timeByteData	//waves.push(timeByteData);
+		//get noise color posn
+		noisePos += 0.005;
+		var n=Math.abs(perlin.noise(noisePos, 0, 0)); colors.push(n);
+		levels.shift(1);
+		//waves.shift(1);
+		colors.shift(1);
+		//write current waveform into all rings
+		for(var j=0; j < SEGMENTS; j++) {loopGeom.vertices[j].z=(timeByteData[j]- 128);	}//stretch by 2
+		// link up last segment
+		loopGeom.vertices[SEGMENTS].z=loopGeom.vertices[0].z;	loopGeom.verticesNeedUpdate=true;
+		//for( i=RINGCOUNT-1; i > 0 ; i--) {
+		for( i=0; i < RINGCOUNT ; i++) {
+			var ringId=RINGCOUNT - i - 1;
+			var normLevel=levels[ringId] + 0.1; //avoid scaling by 0
+			var hue=colors[i];
+			materials[i].color.setHSL(hue, 1, normLevel);
+			materials[i].linewidth=normLevel*6;//3
+			materials[i].opacity=0.1+normLevel; //fadeout 0.2
+			rings[i].scale.z=normLevel/2;
+		}
+		///auto tilt
+		 loopHolder.rotation.x=perlin.noise(noisePos * .5, 0,0) * Math.PI*.6;
+		 loopHolder.rotation.y=perlin.noise(noisePos * .5,10,0) * Math.PI*.6;
+		//
+		loopHolder.rotation.x += (- loopHolder.rotation.x) * 0.2;
+		loopHolder.rotation.y += (loopHolder.rotation.y) * 0.2;
+	}
+	return {init:init,	update:update,	remove:remove,	loopHolder:loopHolder	,run:true	};
+	}());
+//
 var particles=(function() {
 	function init() {
 		var i, line, material, p, parameters=[
@@ -704,7 +767,7 @@ var particles=(function() {
 	}	
 	return {init:init, animate:animate,run:true	};
 	}());
-
+//
 var	spots= (function() {	var ambient,spotLight1,spotLight2,spotLight3;	 var lightHelper1, lightHelper2, lightHelper3, hlp=true;
 			function init( ) {
 				ambient=new THREE.AmbientLight( 0x111111 );
@@ -752,13 +815,14 @@ var	spots= (function() {	var ambient,spotLight1,spotLight2,spotLight3;	 var ligh
 			}
 	return {init:init, tween:tween,	render:render,	animate:animate,run:true	};
 	}());
-
+//
 ///
 function Rnd_opacity(){return 0.5+ 0.5*Math.sin(new Date().getTime() * .0025);	}
 function plug_init(here){ Three_canvas=RENDERER.domElement; //console.log(Three_canvas);
 		particles.init(); // linear spheres
     here.createSphere(); // sun core spheres
 		Radiate.init(); // satell
+		Radiate2.init(); // satell
 		createBackGround.init(); //live background
 		//FakeSun.init();
 		spots.init();
@@ -771,6 +835,7 @@ function PLUG_PLAY(now){
 				WEBGL.light.position.z=Math.cos( now * 0.3 ) * 30;
 	}
 	if(Radiate.run)		Radiate.update();
+	if(Radiate2.run)		Radiate2.update();
 	if(particles.run)	particles.animate(now);
 	if(spots.run)			spots.render();
 	//if(FakeSun.run)	FakeSun.update();
