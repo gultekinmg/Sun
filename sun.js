@@ -654,7 +654,7 @@ var Radiate=(function() {
 	}());
 //
 var Radiate2=(function() {
-	var RINGCOUNT=20, SEPARATION=50, INIT_RADIUS=40, SEGMENTS=256, VOL_SENS=2, BIN_COUNT=256
+	var RINGCOUNT=20, SEPARATION=150, INIT_RADIUS=140, SEGMENTS=256, VOL_SENS=2, BIN_COUNT=256
 				, rings=[],materials=[], levels=[], colors=[];
 	var loopHolder=new THREE.Object3D();
 	var perlin=new ImprovedNoise(), noisePos=0, freqByteData, timeByteData, loopGeom;//one geom for all rings
